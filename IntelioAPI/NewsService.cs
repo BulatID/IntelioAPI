@@ -32,6 +32,8 @@ public class NewsService
                     rssSources = context.RssSources.ToList();
                 }
 
+                GetPicture pic = new GetPicture();
+
                 bot.SendTextMessage($"[<code>{DateTime.Now}</code>]: Приступаю к сканированию сайтов");
 
                 foreach (var source in rssSources)
@@ -84,13 +86,20 @@ public class NewsService
                                     {
                                         if (!db.News.Any(n => n.Title == news.Title))
                                         {
-                                            db.News.Add(news);
+                                            string picture = pic.getPictureUrl(news.Source);
+                                            if (picture != null)
+                                            {
+                                                news.ImageUrl = picture;
+                                                Task.Delay(3000);
+                                            }
 
                                             if (i == 0)
                                             {
                                                 bot.SendTextMessage($"[<code>{DateTime.Now}</code>]: Сканирую сайт {source.Url}");
                                             }
                                             i++;
+
+                                            db.News.Add(news);
                                         }
                                         db.SaveChanges();
                                     }

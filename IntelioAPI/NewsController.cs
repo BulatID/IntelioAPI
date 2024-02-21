@@ -44,7 +44,7 @@ public class NewsController : ControllerBase
     {
         if (!DateTime.TryParse(date, out DateTime searchDate))
         {
-            return BadRequest("Invalid date format. Please provide the date in yyyy-MM-dd format.");
+            return BadRequest("Неверный формат. Используйте формат yyyy-MM-dd");
         }
 
         DateTime searchDateStart = searchDate.Date;
@@ -58,5 +58,33 @@ public class NewsController : ControllerBase
         }
 
         return Ok(newsByDate);
+    }
+
+    [HttpGet("category")]
+    public IActionResult GetUniqueCategories()
+    {
+        var uniqueCategories = _dbContext.News.Where(n => !string.IsNullOrEmpty(n.Category)).Select(n => n.Category).Distinct().ToList();
+
+        if (uniqueCategories.Count == 0)
+        {
+            return NotFound("Категории не найдены!");
+        }
+
+        return Ok(uniqueCategories);
+    }
+
+    [HttpGet("category/search")]
+    public IActionResult GetNewsByCategory(string selected)
+    {
+        var category = _dbContext.News
+                            .Where(n => n.Category == selected)
+                            .ToList();
+
+        if (category.Count == 0)
+        {
+            return NotFound($"Нет новостей для жанра '{category}'");
+        }
+
+        return Ok(category);
     }
 }
