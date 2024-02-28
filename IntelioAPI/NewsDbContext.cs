@@ -3,17 +3,22 @@ using System.IO;
 
 public class NewsDbContext : DbContext
 {
-    public DbSet<News> News { get; set; }
-    public DbSet<RssSource> RssSources { get; set; }
+    public DbSet<News>? News { get; set; }
+    public DbSet<RssSource>? RssSources { get; set; }
+    public DbSet<TGUser>? TGuser { get; set; }
+    public DbSet<Parameters>? Parameters { get; set; }
+    public DbSet<StopWords>? StopWords { get; set; }
+    public DbSet<Rates>? Rates { get; set; }
+    public DbSet<Favorites>? Favorites { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
     {
-        string databasePath = "news.db";
+        string databasePath = "data.db";
         options.UseSqlite($"Data Source={databasePath}");
     }
 
     public void EnsureDbCreated()
     {
-        Database.EnsureCreated(); // Убеждаемся, что база данных создана
+        Database.EnsureCreated();
     }
 }

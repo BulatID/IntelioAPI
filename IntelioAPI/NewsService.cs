@@ -1,10 +1,7 @@
 ﻿using IntelioAPI;
-using System;
-using System.Linq;
 using System.Net;
 using System.ServiceModel.Syndication;
 using System.Text;
-using System.Threading;
 using System.Xml;
 
 public class NewsService
@@ -25,6 +22,7 @@ public class NewsService
         {
             try
             {
+
                 List<RssSource> rssSources;
 
                 using (var context = new NewsDbContext())
@@ -95,7 +93,8 @@ public class NewsService
 
                                             if (i == 0)
                                             {
-                                                bot.SendTextMessage($"[<code>{DateTime.Now}</code>]: Сканирую сайт {source.Url}");
+                                                Console.WriteLine($"{DateTime.Now}: Сканирую сайт {source.Url}");
+                                                //bot.SendTextMessage($"[<code>{DateTime.Now}</code>]: Сканирую сайт {source.Url}");
                                             }
                                             i++;
 
@@ -112,12 +111,25 @@ public class NewsService
             }
             catch (Exception ex)
             {
-                bot.SendTextMessage($"[<code>{DateTime.Now}</code>]: При сканировании сайта произошла ошибка:\n<code>{ex.ToString()}</code>");
+                Console.WriteLine($"[<code>{DateTime.Now}</code>]: При сканировании сайта произошла ошибка!");
             }
-            timer.Change(30000, Timeout.Infinite);
-            Console.WriteLine("Iteration complete");
+            timer.Change(1800000, Timeout.Infinite);
         }, null, 0, Timeout.Infinite);
     }
-    
+
+    public string GetParameter(string name)
+    {
+        var parameterValue = _dbContext.Parameters
+            .FirstOrDefault(p => p.Name == name)?.Value;
+
+        if (string.IsNullOrEmpty(parameterValue))
+        {
+            return "Empty";
+        }
+        else
+        {
+            return parameterValue;
+        }
+    }
 }
 

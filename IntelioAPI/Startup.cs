@@ -1,4 +1,5 @@
-﻿using IntelioAPI;
+﻿using Deployf.Botf;
+using IntelioAPI;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -22,13 +23,15 @@ public class Startup
     {
         services.AddControllers();
         services.AddScoped<NewsService>();
+        services.AddScoped<AdminPanel>();
         services.AddDbContext<NewsDbContext>();
+        services.AddBotf("6645316932:AAE714vfzDOV21hs585fcLjpEMkL9kQZaW8");
     }
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env, NewsService newsService)
     {
         app.UseRouting();
-
+        app.UseBotf();
         app.UseEndpoints(endpoints =>
         {
             endpoints.MapControllers();

@@ -1,12 +1,22 @@
+using Deployf.Botf;
+using IntelioAPI;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Hosting;
 using System.Threading.Tasks;
+using Telegram.Bot.Types;
 
-public class Program
+public class Program : BotfProgram
 {
-    public static void Main(string[] args)
+
+    public static async Task Main(string[] args)
     {
-        CreateHostBuilder(args).Build().Run();
+
+        var webHost = CreateHostBuilder(args).Build();
+
+        await webHost.RunAsync(new System.Threading.CancellationTokenSource().Token);
+
+        await Task.Delay(-1);
     }
 
     public static IHostBuilder CreateHostBuilder(string[] args) =>
@@ -14,5 +24,6 @@ public class Program
             .ConfigureWebHostDefaults(webBuilder =>
             {
                 webBuilder.UseStartup<Startup>();
+                //webBuilder.UseUrls("http://localhost:4001");
             });
 }

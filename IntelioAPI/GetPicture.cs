@@ -11,8 +11,6 @@ namespace IntelioAPI
             HtmlWeb web = new HtmlWeb();
             HtmlDocument doc = web.Load(url);
 
-            Console.WriteLine($"Достаю фотку с: {url}");
-
             var metaTags = doc.DocumentNode.SelectNodes("//meta");
 
             string imageUrl = "";
@@ -32,17 +30,16 @@ namespace IntelioAPI
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
-                return null;
+                return "https://i.ibb.co/sWHtCbW/Intelio.png";
             }
 
             if (!string.IsNullOrEmpty(imageUrl))
             {
-                Console.WriteLine($"Фото: {imageUrl}");
                 return imageUrl;
             }
             else
             {
-                return null;
+                return "https://i.ibb.co/sWHtCbW/Intelio.png";
             }
         }
     }
