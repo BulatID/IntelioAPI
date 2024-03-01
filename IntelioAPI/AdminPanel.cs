@@ -5,6 +5,7 @@ using System.Reflection.Metadata;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
 using Newtonsoft.Json;
+using Telegram.Bot.Types.InputFiles;
 
 namespace IntelioAPI
 {
@@ -24,11 +25,11 @@ namespace IntelioAPI
             PushLL($"<b>Добро пожаловать,</b> <code>{Context!.GetUserFullName()!.Trim()} 👋</code>");
             PushL("🔽 Выберите нужную кнопку на клавиатуре 🔽");
             RowButton("📰 Читать все новости", Q(ReadNews, lastId));
-            await Send();
             if (await isAdmin())
             {
                 RowKButton("🛠 Админ-панель");
             }
+            await Send();
 
             var existingUser = _dbContext.TGuser.FirstOrDefault(currentUser => currentUser.id == ChatId);
 
@@ -53,6 +54,9 @@ namespace IntelioAPI
         [Action]
         public async void ReadNews(int sId)
         {
+            int next = sId + 1;
+            int prev = sId - 1;
+
             try
             {
                 var selectedNews = _dbContext.News.FirstOrDefault(newsDB => newsDB.Id == sId);
@@ -61,20 +65,26 @@ namespace IntelioAPI
                 PushLL(selectedNews.Content.ToString());
                 PushL($"Дата: <code>{selectedNews.Date}</code> | id: <code>{selectedNews.Id}</code>");
                 RowButton("🔗 Открыть источник", $"{selectedNews.Source}");
+                if (CheckIfIdExists(next))
+                    RowButton("⬅️", Q(ReadNews, next));
+
+                if (CheckIfIdExists(prev))
+                    Button("➡️", Q(ReadNews, prev));
             }
             catch
             {
-                PushL("Не удалось загрузить новость");
+                Photo("https://i.ibb.co/sjN0nmn/Error.png");
+
+                PushLL("<b>🛑 Не удалось загрузить новость</b>");
+                PushL("<i>Мы уже работаем над решением...</i>");
+
+                if (CheckIfIdExists(next))
+                    RowButton("⬅️", Q(ReadNews, next));
+
+                if (CheckIfIdExists(prev))
+                    Button("➡️", Q(ReadNews, prev));
+
             }
-
-            int next = sId + 1;
-            int prev = sId - 1;
-
-            if (CheckIfIdExists(next))
-                RowButton("⬅️", Q(ReadNews, next));
-
-            if(CheckIfIdExists(prev))
-                Button("➡️", Q(ReadNews, prev));
         }
 
         [Action]
@@ -92,9 +102,29 @@ namespace IntelioAPI
             PushLL("<b>🛠 Админ-панель</b>");
             Push("⚠️ Будьте осторожны ⚠️");
             RowKButton("Управление источниками");
+            RowKButton("Скачать базу данных");
+            await Send();
             //RowKButton("Управление стоп-словами");
             //RowKButton("Статистика");
             //RowKButton("Провести рассылку внутри бота");
+        }
+
+        [Action("Скачать базу данных")]
+        public async Task DBdownload()
+        {
+            if (await isAdmin() == false)
+                return;
+
+            using (var stream = System.IO.File.Open("data.db", System.IO.FileMode.Open))
+            {
+                InputOnlineFile inputFile = new InputOnlineFile(stream, "data.db");
+
+                var message = await Context.Bot.Client.SendDocumentAsync(
+                    chatId: ChatId,
+                    document: inputFile,
+                    caption: $"Версия на {DateTime.Now} для {ChatId}"
+                );
+            }
         }
 
         [Action("Управление источниками")]
