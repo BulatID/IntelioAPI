@@ -10,6 +10,8 @@ public class NewsDbContext : DbContext
     public DbSet<StopWords>? StopWords { get; set; }
     public DbSet<Rates>? Rates { get; set; }
     public DbSet<Favorites>? Favorites { get; set; }
+    public DbSet<ApiKeys>? ApiKeys { get; set; }
+    public DbSet<PayList>? PayList { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
     {

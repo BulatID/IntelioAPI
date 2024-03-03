@@ -10,7 +10,6 @@ namespace IntelioAPI
         {
             string botToken = "6645316932:AAE714vfzDOV21hs585fcLjpEMkL9kQZaW8";
 
-
             try
             {
                 string url = $"https://api.telegram.org/bot{botToken}/sendMessage?chat_id=-1002144477508&parse_mode=HTML&text={Text}";

@@ -24,10 +24,11 @@ public class NewsService
         timer = new Timer((e) =>
         {
             List<RssSource> rssSources;
-
+            string[] banWord;
             using (var context = new NewsDbContext())
             {
                 rssSources = context.RssSources.ToList();
+                banWord = context.StopWords.Select(stopWord => stopWord.word).ToArray();
             }
 
             GetPicture pic = new GetPicture();
@@ -59,15 +60,12 @@ public class NewsService
                                 {
                                     string content = Regex.Replace(Regex.Replace(Regex.Replace(Encoding.UTF8.GetString(Encoding.GetEncoding("windows-1251").GetBytes(item.Summary.Text)), @"<.*?>", string.Empty), @"&[\w#]+?;", m => { switch (m.Value) { case "&quot;": return "\""; case "&nbsp;": return " "; default: return string.Empty; } }), @"\s+", " ").Trim();
 
-                                    string[] banWord = { "Украина", "Украине", "войска", "война", "беспилотники", "баллистические ракеты",
-                                    "вооруженные силы", "Зеленский", "Зеленского", "разведданные", "фашизм", "нацизм", "нацист", "Сармат",
-                                    "СВО"};
-
                                     foreach (var word in banWord)
                                     {
                                         if (content.Contains(word))
                                         {
                                             boolBan = true;
+                                            bot.SendTextMessage($"🤫 Цензурирую в {source.Url} слово: <code>{word}</code>");
                                             break;
                                         }
                                     }
@@ -134,8 +132,8 @@ public class NewsService
                 {
                     Console.WriteLine($"[<code>{DateTime.Now}</code>]: При сканировании сайта произошла ошибка!");
                 }
-                bot.SendTextMessage($"[<code>{DateTime.Now}</code>]: Сканирование сайтов окончено");
             }
+            bot.SendTextMessage($"[<code>{DateTime.Now}</code>]: Сканирование сайтов окончено");
             timer.Change(1800000, Timeout.Infinite);
         }, null, 0, Timeout.Infinite);
     }

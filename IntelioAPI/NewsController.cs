@@ -5,7 +5,7 @@ using System.ComponentModel;
 using System.Linq;
 using Telegram.Bot.Types;
 
-[Route("api/news")]
+[Route($"api/news")]
 public class NewsController : ControllerBase
 {
     private readonly NewsDbContext _dbContext;
@@ -15,35 +15,65 @@ public class NewsController : ControllerBase
         _dbContext = dbContext;
     }
 
-    public void SendInfo()
+    public bool CheckAPI(string api)
     {
-        bot.SendTextMessage($"Получен запрос от {HttpContext.Connection.RemoteIpAddress}");
+        var apikey = _dbContext.ApiKeys.FirstOrDefault(n => n.Key == api);
+
+        if (apikey == null)
+        {
+            bot.SendTextMessage($"<b>Неудачная попытка запроса по ключу: неверный ключ</b>");
+            return false;
+        }
+
+        bot.SendTextMessage($"<b>Получен запрос от</b> <code>{api}</code>\n\n" +
+            $"📊 Информация о ключе:\n" +
+            $"Пользователь: <a href=\"tg://user?id={apikey.ChatId}\">перейти</a>\n" +
+            $"Баланс: <code>{apikey.Balance}</code>\n" +
+            $"Всего сделано запросов: <code>{apikey.Count}</code>\n" +
+            $"Дата генерации ключа: <code>{apikey.Created}</code>");
+
+        if (apikey.Balance <= 0) return false;
+
+        apikey.Balance = apikey.Balance - apikey.Tariff;
+        apikey.Count = apikey.Count + 1;
+
+        _dbContext.ApiKeys.Update(apikey);
+        _dbContext.SaveChanges();
+
+        return true;
     }
 
     [HttpGet("favorites")]
-    public IActionResult Favorites(string userId, int newsId, string actions)
+    public IActionResult Favorites(string api, string userId, int newsId, string actions)
     {
-        SendInfo();
+        if (CheckAPI(api) == false) return BadRequest("Невозможно обработать запрос");
 
         switch (actions)
         {
             case "get":
 
-                List<Favorites> getFavorite = _dbContext.Favorites.Where(n => n.userId == userId).ToList();
+                List<Favorites> favoriteNews = _dbContext.Favorites.Where(n => n.userId == userId).ToList();
 
-                if (getFavorite == null)
+                if (favoriteNews == null || favoriteNews.Count == 0)
                 {
                     return NotFound("0");
                 }
                 else
                 {
-                    return Ok(getFavorite);
+                    List<int?> newsIds = favoriteNews.Select(f => f.newsId).ToList();
+
+                    List<int> nonNullableNewsIds = newsIds.Where(id => id.HasValue).Select(id => id.Value).ToList();
+
+                    List<News> userFavoriteNews = _dbContext.News.Where(n => nonNullableNewsIds.Contains(n.Id))
+                                                                .OrderByDescending(n => n.Date)
+                                                                .ToList();
+
+                    return Ok(userFavoriteNews);
                 }
 
             case "add":
 
                 List<Favorites> foundFavorite = _dbContext.Favorites.Where(n => n.userId == userId && n.newsId == newsId).ToList();
-                SendInfo();
 
                 if (foundFavorite.Count != 0)
                 {
@@ -83,9 +113,9 @@ public class NewsController : ControllerBase
     }
 
     [HttpGet("rate")]
-    public IActionResult Rate(string userId, int newsId, string actions)
+    public IActionResult Rate(string api, string userId, int newsId, string actions)
     {
-        SendInfo();
+        if (CheckAPI(api) == false) return BadRequest("Невозможно обработать запрос");
 
         switch (actions)
         {
@@ -104,7 +134,6 @@ public class NewsController : ControllerBase
 
             case "set":
                 List<Rates> foundRate = _dbContext.Rates.Where(n => n.userId == userId && n.newsId == newsId).ToList();
-                SendInfo();
 
                 if (foundRate.Count != 0)
                 {
@@ -142,30 +171,29 @@ public class NewsController : ControllerBase
     }
 
     [HttpGet("all")]
-    public IActionResult GetNews()
+    public IActionResult GetNews(string api)
     {
-        /*List<News> newsList = _dbContext.News.ToList();
-        SendInfo();
-        return Ok(newsList);*/
+        if (CheckAPI(api) == false) return BadRequest("Невозможно обработать запрос");
 
         List<News> newsList = _dbContext.News.OrderByDescending(news => news.Date).ToList();
-        SendInfo();
         return Ok(newsList);
     }
 
     [HttpGet("last")]
-    public IActionResult GetLastNews(int count)
+    public IActionResult GetLastNews(string api, int count)
     {
+        if (CheckAPI(api) == false) return BadRequest("Невозможно обработать запрос");
+
         List<News> lastNewsList = _dbContext.News.OrderByDescending(n => n.Id).Take(count).ToList();
-        SendInfo();
         return Ok(lastNewsList);
     }
 
     [HttpGet("search")]
-    public IActionResult SearchNews(string contains)
+    public IActionResult SearchNews(string api, string contains)
     {
+        if (CheckAPI(api) == false) return BadRequest("Невозможно обработать запрос");
+
         List<News> foundNews = _dbContext.News.Where(n => n.Title.Contains(contains) || n.Content.Contains(contains)).ToList();
-        SendInfo();
 
         if (foundNews.Count == 0)
         {
@@ -176,9 +204,9 @@ public class NewsController : ControllerBase
     }
 
     [HttpGet("search/date")]
-    public IActionResult SearchNewsByDate(string date)
+    public IActionResult SearchNewsByDate(string api, string date)
     {
-        SendInfo();
+        if (CheckAPI(api) == false) return BadRequest("Невозможно обработать запрос");
 
         if (!DateTime.TryParse(date, out DateTime searchDate))
         {
@@ -199,9 +227,9 @@ public class NewsController : ControllerBase
     }
 
     [HttpGet("category")]
-    public IActionResult GetUniqueCategories()
+    public IActionResult GetUniqueCategories(string api)
     {
-        SendInfo();
+        if (CheckAPI(api) == false) return BadRequest("Невозможно обработать запрос");
 
         var uniqueCategories = _dbContext.News.Where(n => !string.IsNullOrEmpty(n.Category)).Select(n => n.Category).Distinct().ToList();
 
@@ -214,9 +242,9 @@ public class NewsController : ControllerBase
     }
 
     [HttpGet("category/search")]
-    public IActionResult GetNewsByCategory(string selected)
+    public IActionResult GetNewsByCategory(string api, string selected)
     {
-        SendInfo();
+        if (CheckAPI(api) == false) return BadRequest("Невозможно обработать запрос");
 
         var category = _dbContext.News
                             .Where(n => n.Category == selected)
@@ -231,10 +259,12 @@ public class NewsController : ControllerBase
     }
 
     [HttpGet("today")]
-    public IActionResult GetNewsForToday()
+    public IActionResult GetNewsForToday(string api)
     {
         try
         {
+            if (CheckAPI(api) == false) return BadRequest("Невозможно обработать запрос");
+
             DateTime today = DateTime.Today;
 
             if (_dbContext.News.Any())
@@ -243,7 +273,6 @@ public class NewsController : ControllerBase
 
                 if (newsListForToday.Any())
                 {
-                    SendInfo();
                     return Ok(newsListForToday);
                 }
                 else
@@ -263,10 +292,12 @@ public class NewsController : ControllerBase
     }
 
     [HttpGet("{newsId}")]
-    public IActionResult GetNewsById(int newsId)
+    public IActionResult GetNewsById(string api, int newsId)
     {
         try
         {
+            if (CheckAPI(api) == false) return BadRequest("Невозможно обработать запрос");
+
             var news = _dbContext.News.FirstOrDefault(news => news.Id == newsId);
 
             if (news != null)
@@ -285,11 +316,12 @@ public class NewsController : ControllerBase
     }
 
     [HttpGet("latest")]
-    public string GetLastNewsId()
+    public IActionResult GetLastNewsId(string api)
     {
-        var lastId = _dbContext.News.OrderByDescending(n => n.Id).Select(n => n.Id).FirstOrDefault().ToString();
-        SendInfo();
+        if (CheckAPI(api) == false) return BadRequest("Невозможно обработать запрос");
 
-        return lastId;
+        var lastId = _dbContext.News.OrderByDescending(n => n.Id).Select(n => n.Id).FirstOrDefault().ToString();
+
+        return Ok(lastId);
     }
 }

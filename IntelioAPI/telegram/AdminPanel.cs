@@ -6,6 +6,7 @@ using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
 using Newtonsoft.Json;
 using Telegram.Bot.Types.InputFiles;
+using Telegram.Bot.Types.ReplyMarkups;
 
 namespace IntelioAPI
 {
@@ -17,99 +18,106 @@ namespace IntelioAPI
             _dbContext = dbContext;
         }
 
-        [Action("/start", "🚀 Запустить / перезагрузить бота")]
-        public async Task Start()
-        {
-            int lastId = Convert.ToInt32(_dbContext.News.OrderByDescending(n => n.Id).Select(n => n.Id).FirstOrDefault().ToString());
-            
-            PushLL($"<b>Добро пожаловать,</b> <code>{Context!.GetUserFullName()!.Trim()} 👋</code>");
-            PushL("🔽 Выберите нужную кнопку на клавиатуре 🔽");
-            RowButton("📰 Читать все новости", Q(ReadNews, lastId));
-            if (await isAdmin())
-            {
-                RowKButton("🛠 Админ-панель");
-            }
-            await Send();
-
-            var existingUser = _dbContext.TGuser.FirstOrDefault(currentUser => currentUser.id == ChatId);
-
-            if (existingUser == null)
-            {
-                DateTime currentTime = DateTime.Now;
-                string formattedTime = currentTime.ToString("yyyy-MM-dd HH:mm:ss");
-
-                TGUser user = new TGUser
-                {
-                    id = ChatId,
-                    username = Context!.GetUsername()!.Trim(),
-                    name = Context!.GetUserFullName()!.Trim(),
-                    jointime = Convert.ToDateTime(formattedTime)
-                };
-
-                await _dbContext.TGuser.AddAsync(user);
-                await _dbContext.SaveChangesAsync();
-            }
-        }
-
-        [Action]
-        public async void ReadNews(int sId)
-        {
-            int next = sId + 1;
-            int prev = sId - 1;
-
-            try
-            {
-                var selectedNews = _dbContext.News.FirstOrDefault(newsDB => newsDB.Id == sId);
-                Photo(selectedNews.ImageUrl.ToString());
-                PushLL($"<b>{selectedNews.Title}</b>");
-                PushLL(selectedNews.Content.ToString());
-                PushL($"Дата: <code>{selectedNews.Date}</code> | id: <code>{selectedNews.Id}</code>");
-                RowButton("🔗 Открыть источник", $"{selectedNews.Source}");
-                if (CheckIfIdExists(next))
-                    RowButton("⬅️", Q(ReadNews, next));
-
-                if (CheckIfIdExists(prev))
-                    Button("➡️", Q(ReadNews, prev));
-            }
-            catch
-            {
-                Photo("https://i.ibb.co/sjN0nmn/Error.png");
-
-                PushLL("<b>🛑 Не удалось загрузить новость</b>");
-                PushL("<i>Мы уже работаем над решением...</i>");
-
-                if (CheckIfIdExists(next))
-                    RowButton("⬅️", Q(ReadNews, next));
-
-                if (CheckIfIdExists(prev))
-                    Button("➡️", Q(ReadNews, prev));
-
-            }
-        }
-
-        [Action]
-        public bool CheckIfIdExists(int id)
-        {
-            return _dbContext.News.Any(n => n.Id == id);
-        }
-
         [Action("🛠 Админ-панель")]
         public async Task Panel()
         {
-            if (await isAdmin() == false)
-                return;
+            if (await isAdmin() == false) return;
 
+            Reply();
             PushLL("<b>🛠 Админ-панель</b>");
             Push("⚠️ Будьте осторожны ⚠️");
-            RowKButton("Управление источниками");
-            RowKButton("Скачать базу данных");
+            RowKButton("🗂 Управление источниками");
+            RowKButton("🚫 Управление стоп-словами");
+            RowKButton("📥 Скачать базу данных");
             await Send();
-            //RowKButton("Управление стоп-словами");
             //RowKButton("Статистика");
             //RowKButton("Провести рассылку внутри бота");
         }
 
-        [Action("Скачать базу данных")]
+        [Action("🚫 Управление стоп-словами")]
+        public async Task stopwords()
+        {
+            if (await isAdmin() == false) return;
+
+            PushL("<b>Выберите нужный пункт:</b>");
+            Button("➕ Добавить новое стоп-слово", Q(AddStopWord));
+            Button("➖ Удалить стоп-слово", Q(DelStopWord));
+        }
+
+        [Action]
+        public async Task AddStopWord()
+        {
+            if (await isAdmin() == false) return;
+
+            PushLL("<b>Введите новое слово или словосочетание</b>");
+            PushL("Введите /stop для отмены");
+            await Send();
+
+            var response = await AwaitText();
+
+            if (response == "/stop") return;
+
+            var existing = await _dbContext.StopWords.FirstOrDefaultAsync(current => current.word == response);
+
+            if (existing != null)
+            {
+                await Send("<b>Данное слово/словосочетание уже существует в базе данных</b>");
+                return;
+            }
+
+            StopWords word = new StopWords
+            {
+                word = response
+            };
+
+            await _dbContext.StopWords.AddAsync(word);
+            await _dbContext.SaveChangesAsync();
+
+            Button("➕ Добавить новое стоп-слово", Q(AddStopWord));
+            Button("➖ Удалить стоп-слово", Q(DelStopWord));
+            await Send("<b>Успешно добавлено</b>");
+        }
+
+        [Action]
+        public async Task DelStopWord()
+        {
+            if (await isAdmin() == false) return;
+
+            PushLL("<b>Выберите слово или словосочетание, которое нужно удалить</b>");
+            PushL("Введите /stop для отмены");
+            await Send();
+
+            List<StopWords> lastWordList = _dbContext.StopWords.OrderByDescending(n => n.word).ToList();
+
+            foreach (var Word in lastWordList)
+            {
+                RowKButton(Word.word.ToString());
+            }
+
+            await Send();
+
+            var response = await AwaitText();
+
+            if (response == "/stop")
+                return;
+
+            StopWords stopw = _dbContext.StopWords.FirstOrDefault(n => n.word == response);
+            if (stopw != null)
+            {
+                _dbContext.StopWords.Remove(stopw);
+                _dbContext.SaveChanges();
+
+                Button("➕ Добавить стоп-слово", Q(AddStopWord));
+                Button("➖ Удалить еще один", Q(DelStopWord));
+                await Send("<b>Успешно удалили</b>");
+            }
+            else
+            {
+                await Send("<b>Не удалось удалить!</b>");
+            }
+        }
+
+        [Action("📥 Скачать базу данных")]
         public async Task DBdownload()
         {
             if (await isAdmin() == false)
@@ -122,20 +130,21 @@ namespace IntelioAPI
                 var message = await Context.Bot.Client.SendDocumentAsync(
                     chatId: ChatId,
                     document: inputFile,
-                    caption: $"Версия на {DateTime.Now} для {ChatId}"
+                    caption: $"<b>Версия на </b><code>{DateTime.Now}</code> <b>для</b> <code>{ChatId}</code>",
+                    parseMode: ParseMode.Html
                 );
             }
         }
 
-        [Action("Управление источниками")]
+        [Action("🗂 Управление источниками")]
         public async Task ContentControl()
         {
             if (await isAdmin() == false)
                 return;
 
             PushL("<b>Выберите нужный пункт:</b>");
-            Button("Добавить RSS-источник", Q(addRss));
-            Button("Удалить RSS-источник", Q(delRss));
+            Button("➕ Добавить RSS-источник", Q(addRss));
+            Button("➖ Удалить RSS-источник", Q(delRss));
         }
 
         [Action]
@@ -170,6 +179,8 @@ namespace IntelioAPI
             await _dbContext.RssSources.AddAsync(rss);
             await _dbContext.SaveChangesAsync();
 
+            Button("➕ Добавить еще один", Q(addRss));
+            Button("➖ Удалить", Q(delRss));
             await Send("<b>Источник добавлен!</b>");
         }
 
@@ -201,6 +212,10 @@ namespace IntelioAPI
             {
                 _dbContext.RssSources.Remove(source);
                 _dbContext.SaveChanges();
+
+                Button("➕ Добавить RSS-источник", Q(addRss));
+                Button("➖ Удалить еще один", Q(delRss));
+                await Send("<b>Успешно удалили</b>");
             } else
             {
                 await Send("<b>Не удалось удалить!</b>");
