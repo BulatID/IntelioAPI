@@ -6,6 +6,7 @@ using Telegram.Bot.Types;
 using System.Text;
 using System.Web;
 using XSystem.Security.Cryptography;
+using XAct.Users;
 
 namespace IntelioAPI.telegram
 {
@@ -20,33 +21,15 @@ namespace IntelioAPI.telegram
         [Action("/start", "🚀 Запустить / перезагрузить бота")]
         public async Task Start()
         {
-            PushLL($"<b>Добро пожаловать,</b> <code>{Context!.GetUserFullName()!.Trim()} 👋</code>");
-            PushL("Выберите нужный пункт:");
-            RowButton("🧑‍💻 Для разработчиков", Q(developerMenu));
-
-            if (await isAdmin() == true)
-            {
+            if (await isAdmin())
                 RowKButton("🛠 Админ-панель");
-            }
 
-            var existingUser = _dbContext.TGuser.FirstOrDefault(currentUser => currentUser.id == ChatId);
+            RowButton("📰 Новости", Q(NewsPanel));
+            RowButton("🧑‍💻 Для разработчиков", Q(developerMenu));
+            PushLL($"<b>Добро пожаловать,</b> <code>{Context!.GetUserFullName()!.Trim()} 👋</code>");
+            PushL("Выберите нужный пункт");
 
-            if (existingUser == null)
-            {
-                DateTime currentTime = DateTime.Now;
-                string formattedTime = currentTime.ToString("yyyy-MM-dd HH:mm:ss");
-
-                TGUser user = new TGUser
-                {
-                    id = ChatId,
-                    username = Context!.GetUsername()!.Trim(),
-                    name = Context!.GetUserFullName()!.Trim(),
-                    jointime = Convert.ToDateTime(formattedTime)
-                };
-
-                await _dbContext.TGuser.AddAsync(user);
-                await _dbContext.SaveChangesAsync();
-            }
+            await registerUser();
         }
 
         [Action("/start")]
@@ -70,6 +53,67 @@ namespace IntelioAPI.telegram
             await Start();
         }
 
+        [Action("/news", "📰 Новости")]
+        public async Task NewsPanel()
+        {
+            var random = new Random();
+            var randomNews = _dbContext.News.ToList().Where(n => !string.IsNullOrEmpty(n.ImageUrl)).ToList();
+            var selectedNews = randomNews[random.Next(0, randomNews.Count)];
+            int lastId = Convert.ToInt32(_dbContext.News.OrderByDescending(n => n.Id).Select(n => n.Id).FirstOrDefault().ToString());
+
+            Photo(selectedNews.ImageUrl);
+            PushLL("<b>📰 Панель новостей</b>");
+            PushL("Персональные новости и другой функционал доступны в нашем мобильном приложении!");
+            RowButton("👀 Читать последние новости", Q(ReadNews, lastId));
+            RowButton("◀️ Назад", Q(Start));
+        }
+
+        [Action]
+        public async void ReadNews(int sId)
+        {
+            int next = sId + 1;
+            int prev = sId - 1;
+
+            try
+            {
+                var selectedNews = _dbContext.News.FirstOrDefault(newsDB => newsDB.Id == sId);
+                Photo(selectedNews.ImageUrl.ToString());
+                PushLL($"<b>{selectedNews.Title}</b>");
+                PushLL(selectedNews.Content.ToString());
+                PushL($"Дата: <code>{selectedNews.Date}</code> | id: <code>{selectedNews.Id}</code>");
+                RowButton("🔗 Открыть источник", $"{selectedNews.Source}");
+                if (CheckIfIdExists(next))
+                    RowButton("⬅️", Q(ReadNews, next));
+
+                if (CheckIfIdExists(prev))
+                    Button("➡️", Q(ReadNews, prev));
+
+            }
+            catch
+            {
+                Photo("https://i.ibb.co/sjN0nmn/Error.png");
+
+                PushLL("<b>🛑 Не удалось загрузить новость</b>");
+                PushL("<i>Мы уже работаем над решением...</i>");
+
+                if (CheckIfIdExists(next))
+                    RowButton("⬅️", Q(ReadNews, next));
+
+                if (CheckIfIdExists(prev))
+                    Button("➡️", Q(ReadNews, prev));
+
+                await AnswerCallback("Произошла ошибка!");
+
+            }
+            RowButton("◀️ Назад", Q(Start));
+        }
+
+        [Action]
+        public bool CheckIfIdExists(int id)
+        {
+            return _dbContext.News.Any(n => n.Id == id);
+        }
+
         [Action("/dev", "💻 Для разработчиков")]
         private async Task developerMenu()
         {
@@ -83,6 +127,7 @@ namespace IntelioAPI.telegram
                 PushL($"<b>🔑 Ваш ключ:</b> <code>{apikey.Key}</code>");
                 PushL($"<b>Ваш тариф за один запрос:</b> <code>{apikey.Tariff} ₽</code>");
                 RowButton("ℹ️ Информация о счете", Q(payMenu));
+                RowButton("📑 Документация", Q(apiInfo));
                 RowButton("🗑 Удалить API-ключ", Q(deleteKey));
             }
             else
@@ -94,6 +139,33 @@ namespace IntelioAPI.telegram
                 RowButton("🚀 Выпустить API-ключ", Q(addKey));
             }
             RowButton("◀️ Назад", Q(Start));
+        }
+
+        [Action]
+        public async Task apiInfo()
+        {
+            PushLL("<b>📑 Документация</b>");
+            PushLL("GET-запросы отправляются на наш сервер: <code>a24916-27c7.w.d-f.pw</code>");
+
+            PushL("• <code>/api/news/all?api={key}</code>");
+            PushL("• <code>/api/news/last?api={key}&count={int}</code>");
+            PushL("• <code>/api/news/search?api={key}&contains={string}</code>");
+            PushL("• <code>/api/news/search/date?api={key}&date={string}</code> — необходимо будет указать текст в виде даты в формате \"yyyy-MM-dd\" (Год, месяц, день)");
+            PushL("• <code>/api/news/category?api={key}</code>");
+            PushL("• <code>/api/news/category/search?api={key}&selected={string}</code>");
+            PushL("• <code>/api/news/{int}?api={key}</code>");
+            PushL("• <code>/api/news/latest?api={key}</code>");
+            PushL("• <code>/api/news/today?api={key}</code>");
+            PushL("• <code>/api/news/rate?api={key}&userId={string}&newsId={int}&actions=set</code>");
+            PushL("• <code>/api/news/rate?api={key}&userId={string}&actions=get</code>");
+            PushL("• <code>/api/news/rate?api={key}&userId={string}&newsId={int}&actions=del</code>");
+            PushL("• <code>/api/news/favorites?api={key}&userId={string}&actions=get</code>");
+            PushL("• <code>/api/news/favorites?api={key}&userId={string}&newsId={int}&actions=add</code>");
+            PushL("• <code>/api/news/favorites?api={key}&userId={string}&newsId={int}&actions=del</code>");
+            PushL("• <code>/api/news/personal?api={key}&userId={string}</code>");
+
+            RowButton("🧑‍💻 Узнать больше", $"https://t.me/BulatID");
+            RowButton("◀️ Назад", Q(developerMenu));
         }
 
         [Action]
@@ -319,6 +391,29 @@ namespace IntelioAPI.telegram
             string url = "https://aaio.so/merchant/pay?" + parameters.ToString();
 
            return url;
+        }
+
+        [Action]
+        public async Task registerUser()
+        {
+            var existingUser = _dbContext.TGuser.FirstOrDefault(currentUser => currentUser.id == ChatId);
+
+            if (existingUser == null)
+            {
+                DateTime currentTime = DateTime.Now;
+                string formattedTime = currentTime.ToString("yyyy-MM-dd HH:mm:ss");
+
+                TGUser user = new TGUser
+                {
+                    id = ChatId,
+                    username = Context!.GetUsername()!.Trim(),
+                    name = Context!.GetUserFullName()!.Trim(),
+                    jointime = Convert.ToDateTime(formattedTime)
+                };
+
+                await _dbContext.TGuser.AddAsync(user);
+                await _dbContext.SaveChangesAsync();
+            }
         }
     }
 }
