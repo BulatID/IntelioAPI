@@ -36,7 +36,7 @@ public class Startup
         {
             endpoints.MapControllers();
         });
-        
+
 
         if (env.IsDevelopment())
         {

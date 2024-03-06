@@ -112,6 +112,29 @@ public class NewsController : ControllerBase
         }
     }
 
+    [HttpGet("personal")]
+    public IActionResult GetPersonalNews(string api, string userId)
+    {
+        if (CheckAPI(api) == false) return BadRequest("Невозможно обработать запрос");
+
+        var userLikes = _dbContext.Rates.Where(r => r.userId == userId).Select(r => r.Category).ToList();
+
+        var recommendedNews = new List<News>();
+
+        if (userLikes.Any())
+        {
+            var categorizedNews = userLikes.SelectMany(category => _dbContext.News.Where(n => n.Category == category)).ToList();
+            var rnd = new Random();
+            recommendedNews = categorizedNews.OrderBy(x => rnd.Next()).ToList();
+        }
+        else
+        {
+            recommendedNews = _dbContext.News.OrderByDescending(n => n.Date).ToList();
+        }
+
+        return Ok(recommendedNews);
+    }
+
     [HttpGet("rate")]
     public IActionResult Rate(string api, string userId, int newsId, string actions)
     {
@@ -140,10 +163,13 @@ public class NewsController : ControllerBase
                     return NotFound("0");
                 }
 
+                var news = _dbContext.News.FirstOrDefault(n => n.Id == newsId);
+
                 Rates rate = new Rates
                 {
                     userId = userId,
-                    newsId = newsId
+                    newsId = newsId,
+                    Category = news.Category
                 };
 
                 _dbContext.Rates.AddAsync(rate);
