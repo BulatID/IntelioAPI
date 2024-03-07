@@ -77,11 +77,26 @@ namespace IntelioAPI.telegram
             try
             {
                 var selectedNews = _dbContext.News.FirstOrDefault(newsDB => newsDB.Id == sId);
+
                 Photo(selectedNews.ImageUrl.ToString());
+
                 PushLL($"<b>{selectedNews.Title}</b>");
-                PushLL(selectedNews.Content.ToString());
+
+                if (selectedNews.Title.Length + selectedNews.Content.Length > 900)
+                {
+                    int excessLength = selectedNews.Title.Length + selectedNews.Content.Length - 900;
+                    int textToKeepLength = selectedNews.Content.Length - excessLength;
+
+                    string content = selectedNews.Content.Substring(0, textToKeepLength) + " ...";
+                    PushLL(content);
+                } else
+                {
+                    PushLL(selectedNews.Content);
+                }
+
                 PushL($"Дата: <code>{selectedNews.Date}</code> | id: <code>{selectedNews.Id}</code>");
-                RowButton("🔗 Открыть источник", $"{selectedNews.Source}");
+                RowButton(WebApp("🔗 Открыть источник", $"{selectedNews.Source}"));
+
                 if (CheckIfIdExists(next))
                     RowButton("⬅️", Q(ReadNews, next));
 
@@ -91,7 +106,7 @@ namespace IntelioAPI.telegram
             }
             catch
             {
-                Photo("https://i.ibb.co/sjN0nmn/Error.png");
+                //Photo("https://i.ibb.co/sjN0nmn/Error.png");
 
                 PushLL("<b>🛑 Не удалось загрузить новость</b>");
                 PushL("<i>Мы уже работаем над решением...</i>");
@@ -105,7 +120,7 @@ namespace IntelioAPI.telegram
                 await AnswerCallback("Произошла ошибка!");
 
             }
-            RowButton("◀️ Назад", Q(Start));
+            RowButton("◀️ Назад", Q(NewsPanel));
         }
 
         [Action]
@@ -198,7 +213,6 @@ namespace IntelioAPI.telegram
                     await Send("<b>Введена неверная сумма!</b>");
                     return;
                 }
-
                 PayList pay = new PayList
                 {
                     ChatId = ChatId,
@@ -209,17 +223,15 @@ namespace IntelioAPI.telegram
                 await _dbContext.PayList.AddAsync(pay);
                 await _dbContext.SaveChangesAsync();
 
-                var id = _dbContext.PayList.FirstOrDefault(n => n.ChatId == ChatId && n.Balance == price);
-
-                if (id == null) return;
-
                 await Context.Bot.Client.DeleteMessageAsync(ChatId, delete.MessageId);
 
-                string url = createBill(id.id, price);
+                int PayId = pay.id;
+
+                string url = createBill(PayId, price);
 
                 PushLL("<b>📝 Счёт на оплату успешно выставлен!</b>");
                 PushLL($"<b>Сумма:</b> <code>{price} ₽</code>");
-                PushL($"<b>❗️ Оплата проверяется автоматически (Идентификатор заказа:</b> <code>{id.id}</code><b>)</b>");
+                PushL($"<b>❗️ Оплата проверяется автоматически (Идентификатор заказа:</b> <code>{PayId}</code><b>)</b>");
                 RowButton(WebApp("💳 Оплатить", url));
                 RowButton("◀️ Назад", Q(payMenu));
                 Button("🧑‍💻 Контакт поддержки", $"https://t.me/BulatID");
@@ -358,7 +370,7 @@ namespace IntelioAPI.telegram
             Context.Bot.Client.SendTextMessageAsync(-1002144477508, $"🛑 Произошла ошибка, клиент оповещен об ошибке.\n\nСработало исключение:\n{e}");
 
             Reply();
-            Photo("https://i.ibb.co/0MD82dG/error-pic.png");
+            //Photo("https://i.ibb.co/0MD82dG/error-pic.png");
             PushLL("<b>Произошла неизвестная ошибка!</b>");
             PushL("Сообщение разработчикам уже отправлено.");
         }

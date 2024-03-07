@@ -6,6 +6,11 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 using static System.Net.Mime.MediaTypeNames;
+using OpenAI.Managers;
+using OpenAI;
+using OpenAI.ObjectModels.RequestModels;
+using OpenAI.ObjectModels;
+using Microsoft.EntityFrameworkCore;
 
 public class NewsService
 {
@@ -21,7 +26,7 @@ public class NewsService
     {
         Timer timer = null;
 
-        timer = new Timer((e) =>
+        timer = new Timer(async (e) =>
         {
             List<RssSource> rssSources;
             string[] banWord;
@@ -66,7 +71,6 @@ public class NewsService
                                         {
                                             boolBan = true;
                                             bot.SendTextMessage($"🤫 Цензурирую в {source.Url} слово: <code>{word}</code>");
-                                            break;
                                         }
                                     }
 
@@ -98,6 +102,10 @@ public class NewsService
                                     foreach (SyndicationCategory category in item.Categories)
                                     {
                                         news.Category = Encoding.UTF8.GetString(Encoding.GetEncoding("windows-1251").GetBytes(category.Name));
+
+                                        if (news.Category == null || news.Category == "")
+                                            news.Category = "Без категории";
+                                        
                                         break;
                                     }
 
@@ -106,10 +114,11 @@ public class NewsService
                                         if (!db.News.Any(n => n.Title == news.Title))
                                         {
                                             string picture = pic.getPictureUrl(news.Source);
+                                            
                                             if (picture != null)
                                             {
                                                 news.ImageUrl = picture;
-                                                Task.Delay(3000);
+                                                await Task.Delay(3000);
                                             }
 
                                             if (i == 0)
@@ -119,7 +128,7 @@ public class NewsService
                                             }
                                             i++;
 
-                                            db.News.Add(news);
+                                            await db.News.AddAsync(news);
                                         }
                                         db.SaveChanges();
                                     }
@@ -130,12 +139,27 @@ public class NewsService
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[<code>{DateTime.Now}</code>]: При сканировании сайта произошла ошибка!");
+                    Console.WriteLine($"[{DateTime.Now}]: При сканировании сайта произошла ошибка!");
                 }
             }
             bot.SendTextMessage($"[<code>{DateTime.Now}</code>]: Сканирование сайтов окончено");
+            deleteTrash();
             timer.Change(1800000, Timeout.Infinite);
         }, null, 0, Timeout.Infinite);
+    }
+
+    public void deleteTrash()
+    {
+        string searchPattern = "core.*";
+        string directoryPath = AppDomain.CurrentDomain.BaseDirectory;
+
+        string[] files = Directory.GetFiles(directoryPath, searchPattern);
+
+        foreach (string file in files)
+        {
+            File.Delete(file);
+            Console.WriteLine($"Файл '{file}' был удален!.");
+        }
     }
 
     public string GetParameter(string name)
