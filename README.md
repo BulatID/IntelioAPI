@@ -72,3 +72,5 @@ https://a24916-27c7.w.d-f.pw
 ---
 
 Если у вас есть вопросы или вам нужна дополнительная помощь, не стесняйтесь обращаться! 🚀
+
+![alt text]([http://url/to/img.png](https://w7.pngwing.com/pngs/172/54/png-transparent-telegram-encapsulated-postscript-transfer-blue-angle-triangle.png)https://w7.pngwing.com/pngs/172/54/png-transparent-telegram-encapsulated-postscript-transfer-blue-angle-triangle.png)
