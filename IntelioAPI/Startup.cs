@@ -25,7 +25,7 @@ public class Startup
         services.AddScoped<NewsService>();
         services.AddScoped<AdminPanel>();
         services.AddDbContext<NewsDbContext>();
-        services.AddBotf("6645316932:AAE714vfzDOV21hs585fcLjpEMkL9kQZaW8");
+        services.AddBotf("Telegram key");
     }
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env, NewsService newsService)
